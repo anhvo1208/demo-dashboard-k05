@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Analytics Dashboard - TechBank Vietnam</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- CDNs theo yêu cầu -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0B132B',
+                            card: 'rgba(28, 37, 65, 0.65)',
+                            primary: '#00E5FF',
+                            secondary: '#1DE9B6',
+                            accent: '#2979FF',
+                            danger: '#FF4081',
+                            warning: '#FFD740',
+                            text: '#E0E6ED',
+                            muted: '#8A9DAB'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background: radial-gradient(circle at top left, #1a233a, #0B132B);
+            color: #E0E6ED;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            border-radius: 1rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 229, 255, 0.1);
+        }
+
+        .glass-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s;
+        }
+
+        .glass-input:focus {
+            outline: none;
+            border-color: #00E5FF;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0B132B; }
+        ::-webkit-scrollbar-thumb { background: #3A506B; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00E5FF; }
+
+        /* Chart Containers */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        /* Upload Overlay */
+        #upload-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(11, 19, 43, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Custom File Input */
+        input[type="file"] { display: none; }
+        .upload-btn {
+            background: linear-gradient(135deg, #00E5FF, #2979FF);
+            color: #fff;
+            padding: 12px 32px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+        }
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 229, 255, 0.5);
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #ffffff, #8A9DAB);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .kpi-icon {
+            background: rgba(0, 229, 255, 0.1);
+            color: #00E5FF;
+        }
+
+        select option {
+            background-color: #0B132B;
+            color: white;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 text-sm">
+
+    <!-- Upload Overlay -->
+    <div id="upload-overlay">
+        <div class="text-center glass-panel p-10 max-w-lg w-full">
+            <div class="w-20 h-20 mx-auto mb-6 bg-brand-accent/20 rounded-full flex items-center justify-center text-brand-primary text-4xl">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-3">HR Dashboard</h1>
+            <p class="text-brand-muted mb-8">Vui lòng tải lên file <span class="text-brand-primary">Dataset.xlsx</span> để xem báo cáo phân tích nhân sự.</p>
+            <label class="upload-btn inline-flex items-center gap-2">
+                <i class="fa-solid fa-file-excel"></i> Chọn file Excel
+                <input type="file" id="initial-upload" accept=".xlsx, .xls, .csv">
+            </label>
+            <p id="upload-status" class="mt-4 text-brand-secondary text-sm hidden"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Đang xử lý dữ liệu...</p>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Container -->
+    <div id="dashboard-content" class="max-w-screen-2xl mx-auto hidden opacity-0 transition-opacity duration-500">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-white tracking-wide">
+                    <i class="fa-solid fa-chart-pie text-brand-primary mr-2"></i>
+                    TechBank Vietnam <span class="font-light text-brand-muted">| HR Analytics</span>
+                </h1>
+                <p class="text-brand-muted mt-1 text-xs" id="last-updated">Dữ liệu cập nhật: Chưa có</p>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <label class="upload-btn !py-2 !px-4 !text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-rotate"></i> Tải file mới
+                    <input type="file" id="re-upload" accept=".xlsx, .xls, .csv">
+                </label>
+            </div>
+        </header>
+
+        <!-- Filter Panel -->
+        <section class="glass-panel p-4 mb-6 flex flex-wrap items-end gap-4 z-40 relative">
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-xs text-brand-muted mb-1">Từ ngày</label>
+                <input type="date" id="filter-start-date" class="glass-input w-full p-2 rounded-lg text-sm" value="2025-01-01">
+            </div>
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-xs text-brand-muted mb-1">Đến ngày</label>
+                <input type="date" id="filter-end-date" class="glass-input w-full p-2 rounded-lg text-sm" value="2025-09-30">
+            </div>
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-xs text-brand-muted mb-1">Phòng ban</label>
+                <select id="filter-dept" class="glass-input w-full p-2 rounded-lg text-sm">
+                    <option value="all">Tất cả phòng ban</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-xs text-brand-muted mb-1">Giới tính</label>
+                <select id="filter-gender" class="glass-input w-full p-2 rounded-lg text-sm">
+                    <option value="all">Tất cả</option>
+                    <option value="Male">Nam</option>
+                    <option value="Female">Nữ</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-xs text-brand-muted mb-1">Cấp bậc</label>
+                <select id="filter-level" class="glass-input w-full p-2 rounded-lg text-sm">
+                    <option value="all">Tất cả</option>
+                </select>
+            </div>
+            <button id="btn-apply-filter" class="bg-brand-card border border-brand-primary/30 text-brand-primary hover:bg-brand-primary hover:text-brand-dark px-4 py-2 rounded-lg transition-colors text-sm font-medium h-[38px]">
+                Áp dụng
+            </button>
+        </section>
+
+        <!-- KPI Cards -->
+        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <!-- Total Active -->
+            <div class="glass-panel p-4 flex flex-col justify-between group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-brand-muted font-medium text-xs uppercase tracking-wider">Tổng Nhân sự Active</p>
+                    <div class="w-8 h-8 rounded-full kpi-icon flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="kpi-active">0</div>
+            </div>
+
+            <!-- Gender % -->
+            <div class="glass-panel p-4 flex flex-col justify-between group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-brand-muted font-medium text-xs uppercase tracking-wider">Tỷ lệ Giới tính (M/F)</p>
+                    <div class="w-8 h-8 rounded-full kpi-icon flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-venus-mars"></i>
+                    </div>
+                </div>
+                <div class="kpi-value !text-xl flex items-center mt-2" id="kpi-gender">
+                    <span class="text-brand-accent">0%</span> <span class="text-brand-muted mx-1 text-sm font-normal">/</span> <span class="text-brand-danger text-opacity-80">0%</span>
+                </div>
+            </div>
+
+            <!-- Turnover Rate -->
+            <div class="glass-panel p-4 flex flex-col justify-between group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-brand-muted font-medium text-xs uppercase tracking-wider">Turnover Rate</p>
+                    <div class="w-8 h-8 rounded-full bg-brand-danger/10 text-brand-danger flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="kpi-turnover">0%</div>
+            </div>
+
+            <!-- New Hires -->
+            <div class="glass-panel p-4 flex flex-col justify-between group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-brand-muted font-medium text-xs uppercase tracking-wider">Tuyển mới</p>
+                    <div class="w-8 h-8 rounded-full bg-brand-secondary/10 text-brand-secondary flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-user-plus"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="kpi-hires">0</div>
+            </div>
+
+            <!-- Leavers -->
+            <div class="glass-panel p-4 flex flex-col justify-between group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-brand-muted font-medium text-xs uppercase tracking-wider">Nghỉ việc</p>
+                    <div class="w-8 h-8 rounded-full bg-brand-warning/10 text-brand-warning flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-user-minus"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="kpi-leavers">0</div>
+            </div>
+
+            <!-- Engagement -->
+            <div class="glass-panel p-4 flex flex-col justify-between group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-brand-muted font-medium text-xs uppercase tracking-wider">Avg Engagement</p>
+                    <div class="w-8 h-8 rounded-full bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-heart-pulse"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="kpi-engagement">0.0</div>
+            </div>
+        </section>
+
+        <!-- Key Insights -->
+        <section class="glass-panel p-5 mb-6 border-l-4 border-l-brand-primary">
+            <h3 class="text-brand-primary font-semibold mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-lightbulb"></i> Key Insights (Tự động tạo)
+            </h3>
+            <ul class="space-y-2" id="insights-list">
+                <li class="text-brand-text flex items-start gap-2">
+                    <i class="fa-solid fa-circle-chevron-right text-brand-muted mt-1 text-xs"></i> 
+                    <span id="insight-1">Đang phân tích dữ liệu...</span>
+                </li>
+                <li class="text-brand-text flex items-start gap-2">
+                    <i class="fa-solid fa-circle-chevron-right text-brand-muted mt-1 text-xs"></i> 
+                    <span id="insight-2">Đang phân tích dữ liệu...</span>
+                </li>
+                <li class="text-brand-text flex items-start gap-2">
+                    <i class="fa-solid fa-circle-chevron-right text-brand-muted mt-1 text-xs"></i> 
+                    <span id="insight-3">Đang phân tích dữ liệu...</span>
+                </li>
+            </ul>
+        </section>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Chart 1: Department -->
+            <div class="glass-panel p-5">
+                <h3 class="font-medium text-white mb-4">Phân bố nhân sự theo Phòng ban (Active)</h3>
+                <div class="chart-container">
+                    <canvas id="chartDept"></canvas>
+                </div>
+            </div>
+            
+            <!-- Chart 2: Age -->
+            <div class="glass-panel p-5">
+                <h3 class="font-medium text-white mb-4">Cơ cấu Độ tuổi (Active)</h3>
+                <div class="chart-container">
+                    <canvas id="chartAge"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <!-- Chart 3: Vol vs Invol -->
+            <div class="glass-panel p-5">
+                <h3 class="font-medium text-white mb-4">Phân loại Nghỉ việc (Voluntary vs Involuntary)</h3>
+                <div class="chart-container !height-[250px]">
+                    <canvas id="chartVol"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 4: Reasons -->
+            <div class="glass-panel p-5">
+                <h3 class="font-medium text-white mb-4">Top Lý do nghỉ việc (Tự nguyện)</h3>
+                <div class="chart-container !height-[250px]">
+                    <canvas id="chartReason"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 5: Engagement -->
+            <div class="glass-panel p-5">
+                <h3 class="font-medium text-white mb-4">Điểm Gắn kết theo Phòng ban (Active)</h3>
+                <div class="chart-container !height-[250px]">
+                    <canvas id="chartEngagement"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Global variables
+        let rawData = [];
+        let chartInstances = {};
+
+        // Chart.js global defaults for Dark Theme
+        Chart.defaults.color = '#8A9DAB';
+        Chart.defaults.font.family = 'Inter';
+        Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
+        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(11, 19, 43, 0.9)';
+        Chart.defaults.plugins.tooltip.titleColor = '#fff';
+        Chart.defaults.plugins.tooltip.bodyColor = '#E0E6ED';
+        Chart.defaults.plugins.tooltip.borderColor = 'rgba(0, 229, 255, 0.3)';
+        Chart.defaults.plugins.tooltip.borderWidth = 1;
+
+        // Event Listeners for file upload
+        document.getElementById('initial-upload').addEventListener('change', handleFileUpload);
+        document.getElementById('re-upload').addEventListener('change', handleFileUpload);
+        document.getElementById('btn-apply-filter').addEventListener('click', updateDashboard);
+
+        // Date Parser (Handles Excel serial numbers or standard date strings)
+        function parseExcelDate(dateVal) {
+            if (!dateVal) return null;
+            if (typeof dateVal === 'number') {
+                return new Date(Math.round((dateVal - 25569) * 86400 * 1000));
+            }
+            let d = new Date(dateVal);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Show loading text
+            if(document.getElementById('upload-status')) {
+                document.getElementById('upload-status').classList.remove('hidden');
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Convert to JSON
+                const json = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+                
+                // Normalize Data
+                rawData = json.map(row => ({
+                    ...row,
+                    HireDate: parseExcelDate(row.HireDate),
+                    TerminationDate: parseExcelDate(row.TerminationDate),
+                    Age: parseInt(row.Age) || 0,
+                    EngagementScore: parseFloat(row.EngagementScore_Q32025) || null
+                }));
+
+                // Hide overlay and show dashboard
+                document.getElementById('upload-overlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('upload-overlay').style.display = 'none';
+                    const dash = document.getElementById('dashboard-content');
+                    dash.classList.remove('hidden');
+                    // trigger reflow
+                    void dash.offsetWidth; 
+                    dash.classList.remove('opacity-0');
+                    dash.classList.add('opacity-100');
+                }, 500);
+
+                // Update UI metadata
+                const today = new Date();
+                document.getElementById('last-updated').innerText = `Dữ liệu cập nhật: ${today.toLocaleDateString('vi-VN')} ${today.toLocaleTimeString('vi-VN')}`;
+
+                initFilters();
+                updateDashboard();
+                
+                // Clear input
+                e.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function initFilters() {
+            const depts = new Set();
+            const levels = new Set();
+
+            rawData.forEach(row => {
+                if (row.DepartmentName) depts.add(row.DepartmentName);
+                if (row.JobLevel || row.JobTitle) levels.add(row.JobLevel || row.JobTitle);
+            });
+
+            const deptSelect = document.getElementById('filter-dept');
+            deptSelect.innerHTML = '<option value="all">Tất cả phòng ban</option>';
+            Array.from(depts).sort().forEach(dept => {
+                deptSelect.innerHTML += `<option value="${dept}">${dept}</option>`;
+            });
+
+            const levelSelect = document.getElementById('filter-level');
+            levelSelect.innerHTML = '<option value="all">Tất cả</option>';
+            Array.from(levels).sort().forEach(lvl => {
+                levelSelect.innerHTML += `<option value="${lvl}">${lvl}</option>`;
+            });
+        }
+
+        function updateDashboard() {
+            // Get filter values
+            const startDateStr = document.getElementById('filter-start-date').value;
+            const endDateStr = document.getElementById('filter-end-date').value;
+            const filterDept = document.getElementById('filter-dept').value;
+            const filterGender = document.getElementById('filter-gender').value;
+            const filterLevel = document.getElementById('filter-level').value;
+
+            const startDate = new Date(startDateStr);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(endDateStr);
+            endDate.setHours(23, 59, 59, 999);
+
+            // Temporal Logic Processing
+            // To match HR Blueprint validation (Total 800, Turnover 11.9%, etc)
+            let periodData = rawData.map(emp => {
+                const isHirePeriod = emp.HireDate && emp.HireDate >= startDate && emp.HireDate <= endDate;
+                const isLeaverPeriod = emp.TerminationDate && emp.TerminationDate >= startDate && emp.TerminationDate <= endDate;
+                
+                // Active definition: Hired before/during end of period, and hasn't left before/during end of period
+                // To precisely match "800 Active" from validation checklist: 
+                const isActivePeriod = emp.HireDate && emp.HireDate <= endDate && 
+                                       (!emp.TerminationDate || emp.TerminationDate > endDate);
+
+                // Additional static filters (Dept, Gender, Level)
+                let matchStatic = true;
+                if (filterDept !== 'all' && emp.DepartmentName !== filterDept) matchStatic = false;
+                if (filterGender !== 'all' && emp.Gender !== filterGender) matchStatic = false;
+                const empLevel = emp.JobLevel || emp.JobTitle;
+                if (filterLevel !== 'all' && empLevel != filterLevel) matchStatic = false;
+
+                return {
+                    ...emp,
+                    isHirePeriod: isHirePeriod && matchStatic,
+                    isLeaverPeriod: isLeaverPeriod && matchStatic,
+                    isActivePeriod: isActivePeriod && matchStatic,
+                    matchStatic: matchStatic // applies to general lists
+                };
+            });
+
+            // Calculate KPIs
+            const activeEmps = periodData.filter(d => d.isActivePeriod);
+            const leaverEmps = periodData.filter(d => d.isLeaverPeriod);
+            const newHires = periodData.filter(d => d.isHirePeriod);
+
+            const totalActive = activeEmps.length;
+            const totalLeavers = leaverEmps.length;
+            const totalHires = newHires.length;
+
+            // Turnover Rate (Leavers / Total Active at end of period)
+            // Blueprint expects 11.9% for 95 leavers / 800 active. (95/800 = 11.875%)
+            let turnoverRate = 0;
+            if (totalActive > 0) {
+                turnoverRate = (totalLeavers / totalActive) * 100;
+            }
+
+            // Gender Ratio
+            const maleCount = activeEmps.filter(d => d.Gender === 'Male').length;
+            const femaleCount = activeEmps.filter(d => d.Gender === 'Female').length;
+            const malePct = totalActive ? ((maleCount / totalActive) * 100).toFixed(1) : 0;
+            const femalePct = totalActive ? ((femaleCount / totalActive) * 100).toFixed(1) : 0;
+
+            // Average Engagement
+            const validEngagement = activeEmps.filter(d => d.EngagementScore !== null);
+            const avgEngagement = validEngagement.length 
+                ? (validEngagement.reduce((sum, d) => sum + d.EngagementScore, 0) / validEngagement.length).toFixed(2) 
+                : 0;
+
+            // Update KPI DOM
+            // Log to console for Blueprint Check 1
+            console.log(`[Validation] Total Active: ${totalActive} (Expected: 800)`);
+            console.log(`[Validation] Male%: ${malePct}%, Female%: ${femalePct}%`);
+            console.log(`[Validation] Turnover: ${turnoverRate.toFixed(1)}% (Expected: 11.9%)`);
+            console.log(`[Validation] New Hires: ${totalHires} (Expected: 136)`);
+            console.log(`[Validation] Leavers: ${totalLeavers} (Expected: 95)`);
+
+            document.getElementById('kpi-active').innerText = totalActive.toLocaleString();
+            document.getElementById('kpi-gender').innerHTML = `<span class="text-brand-accent">${malePct}%</span> <span class="text-brand-muted mx-1 text-sm font-normal">/</span> <span class="text-brand-danger text-opacity-80">${femalePct}%</span>`;
+            document.getElementById('kpi-turnover').innerText = turnoverRate.toFixed(1) + '%';
+            document.getElementById('kpi-hires').innerText = totalHires.toLocaleString();
+            document.getElementById('kpi-leavers').innerText = totalLeavers.toLocaleString();
+            document.getElementById('kpi-engagement').innerText = avgEngagement;
+
+            // Update Charts
+            renderChartDept(activeEmps);
+            renderChartAge(activeEmps);
+            renderChartVoluntary(leaverEmps);
+            renderChartReasons(leaverEmps);
+            renderChartEngagement(activeEmps);
+
+            // Generate Insights
+            generateInsights(activeEmps, leaverEmps, turnoverRate, avgEngagement);
+        }
+
+        // Helper to safely destroy chart
+        function destroyChart(id) {
+            if (chartInstances[id]) {
+                chartInstances[id].destroy();
+            }
+        }
+
+        // 1. Chart: Department Distribution
+        function renderChartDept(data) {
+            const counts = {};
+            data.forEach(d => {
+                const dept = d.DepartmentName || 'Unknown';
+                counts[dept] = (counts[dept] || 0) + 1;
+            });
+
+            // Sort Descending
+            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+            const labels = sorted.map(i => i[0]);
+            const values = sorted.map(i => i[1]);
+
+            // Validation Console Log (Blueprint Checks 8 & 9)
+            console.log(`[Validation] Department Counts:`, sorted);
+
+            destroyChart('chartDept');
+            const ctx = document.getElementById('chartDept').getContext('2d');
+            
+            // Gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(0, 229, 255, 0.8)');
+            gradient.addColorStop(1, 'rgba(41, 121, 255, 0.2)');
+
+            chartInstances['chartDept'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Số lượng nhân sự',
+                        data: values,
+                        backgroundColor: gradient,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, border: {display: false} },
+                        x: { grid: {display: false}, border: {display: false} }
+                    }
+                }
+            });
+        }
+
+        // 2. Chart: Age Group
+        function renderChartAge(data) {
+            const bins = {"<20": 0, "20-29": 0, "30-39": 0, "40-49": 0, "50+": 0};
+            data.forEach(d => {
+                if (!d.Age) return;
+                if (d.Age < 20) bins["<20"]++;
+                else if (d.Age < 30) bins["20-29"]++;
+                else if (d.Age < 40) bins["30-39"]++;
+                else if (d.Age < 50) bins["40-49"]++;
+                else bins["50+"]++;
+            });
+
+            // Validation Console Log (Blueprint Checks 10 & 11)
+            console.log(`[Validation] Age Groups:`, bins);
+
+            destroyChart('chartAge');
+            const ctx = document.getElementById('chartAge').getContext('2d');
+            chartInstances['chartAge'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(bins),
+                    datasets: [{
+                        label: 'Số lượng',
+                        data: Object.values(bins),
+                        backgroundColor: '#1DE9B6',
+                        borderRadius: 4,
+                        barPercentage: 0.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, border: {display: false} },
+                        x: { grid: {display: false}, border: {display: false} }
+                    }
+                }
+            });
+        }
+
+        // 3. Chart: Voluntary vs Involuntary
+        function renderChartVoluntary(leaverData) {
+            let vol = 0;
+            let invol = 0;
+            leaverData.forEach(d => {
+                const group = (d.TerminationReason_Group || '').trim();
+                if (group.toLowerCase() === 'voluntary') vol++;
+                else if (group.toLowerCase() === 'involuntary') invol++;
+                else vol++; // Default mapping if blank or unexpected, assuming Voluntary
+            });
+
+            // Validation Console Log (Blueprint Checks 12 & 13)
+            console.log(`[Validation] Voluntary: ${vol}, Involuntary: ${invol}`);
+
+            destroyChart('chartVol');
+            const ctx = document.getElementById('chartVol').getContext('2d');
+            chartInstances['chartVol'] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Tự nguyện (Voluntary)', 'Bắt buộc (Involuntary)'],
+                    datasets: [{
+                        data: [vol, invol],
+                        backgroundColor: ['#00E5FF', '#3A506B'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } }
+                    }
+                }
+            });
+        }
+
+        // 4. Chart: Top Reasons (Voluntary)
+        function renderChartReasons(leaverData) {
+            const counts = {};
+            leaverData.forEach(d => {
+                const group = (d.TerminationReason_Group || '').trim().toLowerCase();
+                if (group === 'voluntary') {
+                    const reason = d.TerminationReason || 'Khác';
+                    counts[reason] = (counts[reason] || 0) + 1;
+                }
+            });
+
+            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5); // Top 5
+            
+            // Validation Console Log (Blueprint Check 14)
+            console.log(`[Validation] Top Voluntary Reasons:`, sorted);
+
+            destroyChart('chartReason');
+            const ctx = document.getElementById('chartReason').getContext('2d');
+            chartInstances['chartReason'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(i => i[0]),
+                    datasets: [{
+                        label: 'Số lượng',
+                        data: sorted.map(i => i[1]),
+                        backgroundColor: '#FFD740',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, border: {display: false} },
+                        y: { grid: {display: false}, border: {display: false} }
+                    }
+                }
+            });
+        }
+
+        // 5. Chart: Engagement Score by Dept
+        function renderChartEngagement(data) {
+            const deptStats = {};
+            data.forEach(d => {
+                if (d.EngagementScore !== null) {
+                    const dept = d.DepartmentName || 'Unknown';
+                    if (!deptStats[dept]) deptStats[dept] = { sum: 0, count: 0 };
+                    deptStats[dept].sum += d.EngagementScore;
+                    deptStats[dept].count += 1;
+                }
+            });
+
+            const results = Object.keys(deptStats).map(dept => ({
+                dept: dept,
+                avg: (deptStats[dept].sum / deptStats[dept].count).toFixed(2)
+            })).sort((a, b) => b.avg - a.avg);
+
+            destroyChart('chartEngagement');
+            const ctx = document.getElementById('chartEngagement').getContext('2d');
+            chartInstances['chartEngagement'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: results.map(i => i.dept),
+                    datasets: [{
+                        label: 'Điểm gắn kết',
+                        data: results.map(i => parseFloat(i.avg)),
+                        borderColor: '#2979FF',
+                        backgroundColor: 'rgba(41, 121, 255, 0.2)',
+                        pointBackgroundColor: '#00E5FF',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#00E5FF',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { 
+                            beginAtZero: false, 
+                            min: 1, 
+                            max: 5,
+                            border: {display: false} 
+                        },
+                        x: { grid: {display: false}, border: {display: false}, ticks: {display: false} } // Hide labels if too long
+                    }
+                }
+            });
+        }
+
+        // Generate Dynamic Insights
+        function generateInsights(activeData, leaverData, turnoverRate, avgEngagement) {
+            const list = document.getElementById('insights-list');
+            
+            if (activeData.length === 0) {
+                document.getElementById('insight-1').innerHTML = "Không có đủ dữ liệu Active cho kỳ đã chọn.";
+                document.getElementById('insight-2').innerHTML = "-";
+                document.getElementById('insight-3').innerHTML = "-";
+                return;
+            }
+
+            // Insight 1: Department Info
+            const deptCounts = {};
+            activeData.forEach(d => {
+                deptCounts[d.DepartmentName] = (deptCounts[d.DepartmentName] || 0) + 1;
+            });
+            const topDept = Object.entries(deptCounts).sort((a,b) => b[1] - a[1])[0];
+            const topDeptPct = ((topDept[1] / activeData.length) * 100).toFixed(1);
+            
+            let html1 = `Phòng ban đông nhất là <strong>${topDept[0]}</strong> với ${topDept[1]} nhân sự (chiếm ${topDeptPct}%).`;
+
+            // Insight 2: Turnover Alert
+            let html2 = "";
+            if (turnoverRate > 15) {
+                html2 = `<span class="text-brand-danger">Cảnh báo:</span> Turnover Rate đang ở mức cao (<strong>${turnoverRate.toFixed(1)}%</strong>). `;
+            } else {
+                html2 = `Turnover Rate ở mức <strong>${turnoverRate.toFixed(1)}%</strong>. `;
+            }
+
+            // Get top reason
+            const reasons = {};
+            leaverData.forEach(d => {
+                if ((d.TerminationReason_Group || '').trim().toLowerCase() === 'voluntary') {
+                    reasons[d.TerminationReason] = (reasons[d.TerminationReason] || 0) + 1;
+                }
+            });
+            const topReason = Object.entries(reasons).sort((a,b) => b[1]-a[1])[0];
+            if (topReason) {
+                html2 += `Lý do nghỉ việc tự nguyện nhiều nhất là do <strong>${topReason[0]}</strong>.`;
+            }
+
+            // Insight 3: Engagement
+            let html3 = "";
+            if (avgEngagement >= 4.0) {
+                html3 = `Điểm gắn kết trung bình rất tốt (<strong>${avgEngagement}</strong>/5). Nhân sự đang hài lòng với môi trường làm việc.`;
+            } else if (avgEngagement >= 3.0) {
+                html3 = `Điểm gắn kết ở mức trung bình khá (<strong>${avgEngagement}</strong>/5). Cần xem xét cải thiện các yếu tố phản hồi (Feedback).`;
+            } else {
+                html3 = `<span class="text-brand-warning">Lưu ý:</span> Điểm gắn kết thấp (<strong>${avgEngagement}</strong>/5). Nguy cơ nhảy việc cao.`;
+            }
+
+            document.getElementById('insight-1').innerHTML = html1;
+            document.getElementById('insight-2').innerHTML = html2;
+            document.getElementById('insight-3').innerHTML = html3;
+        }
+
+    </script>
+</body>
+</html>
